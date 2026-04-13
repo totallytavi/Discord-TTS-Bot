@@ -28,3 +28,4 @@ Inspired by the original Discord TTS bot written in Rust, this project is an att
 | Mapping mentionables to human understandable | Needs implementation (Priority!) |
 | Pull nickname & language from DB on TTS | Needs implementation (Priority!) |
 | Server settings | Needs implementation |
+| Cleanup eslint and prettier | Needs implementation |
