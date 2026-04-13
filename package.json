@@ -1,0 +1,18 @@
+{
+	"dependencies": {
+		"@discordjs/opus": "^0.10.0",
+		"@discordjs/voice": "^0.19.2",
+		"discord.js": "^14.26.2",
+		"dotenv": "^17.4.1",
+		"google-tts-api": "^2.0.2",
+		"mysql2": "^3.21.0",
+		"sequelize": "^6.37.8",
+		"typescript": "^6.0.2"
+	},
+	"devDependencies": {
+		"@types/node": "^25.5.2",
+		"eslint": "^10.2.0",
+		"prettier": "^3.8.1"
+	},
+	"type": "module"
+}
