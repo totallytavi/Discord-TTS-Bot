@@ -34,7 +34,11 @@ export async function execute(
 
 		modal.setTitle('Language Dialect Selection').setCustomId('settings_language');
 	} else if (interaction.isButton() && interaction.customId.endsWith('nickname')) {
-		const input = new TextInputBuilder().setCustomId('nickname').setMaxLength(32).setStyle(TextInputStyle.Short);
+		const input = new TextInputBuilder()
+			.setCustomId('nickname')
+			.setMaxLength(32)
+			.setStyle(TextInputStyle.Short)
+			.setRequired(false);
 
 		label.setLabel('Enter your nickname').setDescription('Leave it blank to reset').setTextInputComponent(input);
 		modal.setTitle('Nickname Selection').setCustomId('settings_nickname');
