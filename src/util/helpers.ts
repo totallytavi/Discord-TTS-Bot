@@ -1,5 +1,5 @@
 import { VoiceConnectionStatus, createAudioPlayer, entersState, joinVoiceChannel } from '@discordjs/voice';
-import type { Guild, VoiceBasedChannel } from 'discord.js';
+import type { VoiceBasedChannel } from 'discord.js';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { type userSettings } from '../models/user.js';
@@ -82,7 +82,13 @@ export async function startVoiceCall(client: TtsClient, channel: VoiceBasedChann
  * @param guildId Guild ID to get the settings for, defaults to 0 (Global)
  * @returns A copy of the user's settings, giving priority to their guild over global settings
  */
-export async function getSettings(client: TtsClient, userId: string, guildId = '0'): Promise<userSettings> {
+export async function getSettings(
+	client: TtsClient,
+	userId: string,
+	guildId: string | null | undefined = '0',
+): Promise<userSettings> {
+	if (!guildId) guildId = '0';
+
 	const userData = await client.sequelize.models.user.findByPk(userId);
 	if (!userData) {
 		return {};
@@ -112,9 +118,15 @@ export function reduceLanguageList(): string[][] {
 	return list;
 }
 
-export async function connectCheck(guild: Guild, channel: VoiceBasedChannel): Promise<[boolean, string]> {
-	const botMember = guild.members.me!;
-	if (!guild.members.me!.voice.channel) {
+/**
+ * Utility function to test whether the bot is eligible to join a channel
+ * @param client Client for checking existing connections
+ * @param channel Channel to test connection criterion for
+ * @returns If the bot believes it can join VC
+ */
+export async function connectCheck(client: TtsClient, channel: VoiceBasedChannel): Promise<[boolean, string]> {
+	const botMember = await channel.guild.members.fetchMe();
+	if (!botMember.voice.channel) {
 		if (!channel.permissionsFor(botMember).has(['ViewChannel', 'ReadMessageHistory'])) {
 			return [false, 'Missing permissions to view voice channel and its text chat'];
 		}
@@ -128,7 +140,11 @@ export async function connectCheck(guild: Guild, channel: VoiceBasedChannel): Pr
 	if (botMember.voice.channel !== channel) {
 		return [false, "I'm in a differnt VC!"];
 	} else {
-		return [false, "I'm already in your VC!"];
+		if (!client.playerMap.has(botMember.voice.channel.id)) {
+			return [true, 'Reconnect, missing channel connection'];
+		} else {
+			return [false, "I'm already in your VC!"];
+		}
 	}
 }
 

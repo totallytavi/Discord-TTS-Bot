@@ -28,6 +28,7 @@ const sequelize = new Sequelize({
 	database: process.env.DB_DATABASE!,
 	port: Number(process.env.DB_PORT),
 	dialect: 'mysql',
+  logging: process.env.DB_LOGGING === 'true'
 });
 client.playerMap = new Map<string, TtsPlayer>();
 client.sequelize = sequelize as unknown as (typeof client)['sequelize'];

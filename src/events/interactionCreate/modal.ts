@@ -7,7 +7,7 @@ const modals = new Map<string, { execute: (client: TtsClient, interaction: Modal
 for (const handler of readdirSync(fsRelativeDir('./modals')).filter((f) => f.endsWith('.js'))) {
   try {
     const file = await import(relativeDir('./modals', handler));
-    if (file.execute && file.data) {
+    if (file.execute) {
       modals.set(handler.replace('.js', ''), file);
     }
   } catch (err) {
@@ -25,6 +25,7 @@ export async function execute(
 
   const handler = modals.get(interaction.customId.split('_')[0]!);
   if (!handler) {
+    console.info('no handler!', interaction.customId);
     return;
   } else {
     try {

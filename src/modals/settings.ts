@@ -5,6 +5,7 @@ import { TtsClient } from '../util/typings.js';
 export async function execute(client: TtsClient, interaction: ModalSubmitInteraction<'cached'>) {
 	const field = interaction.fields.fields.first();
 	if (!field) {
+    console.info('no field found?')
 		return;
 	}
 
@@ -42,5 +43,16 @@ export async function execute(client: TtsClient, interaction: ModalSubmitInterac
 		updateFunction(userData);
 		userData.changed('settings', true);
 		await userData.save();
-	} catch (err) {}
+    interaction.followUp({
+      content: 'Success! Updated your settings',
+      flags: ['Ephemeral']
+    });
+	} catch (err) {
+    const err_id = btoa(String(Math.floor(Date.now())));
+    console.error('Error committing data update', err_id, err);
+    interaction.followUp({
+      content: `Oh no! Something went wrong. Talk to the developer for help (Error ID: ${err_id})`,
+      flags: ['Ephemeral']
+    })
+  }
 }

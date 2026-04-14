@@ -7,7 +7,7 @@ const components = new Map<string, { execute: (client: TtsClient, interaction: I
 for (const handler of readdirSync(fsRelativeDir('./components')).filter((f) => f.endsWith('.js'))) {
 	try {
 		const file = await import(relativeDir('./components', handler));
-		if (file.execute && file.data) {
+		if (file.execute) {
 			components.set(handler.replace('.js', ''), file);
 		}
 	} catch (err) {
@@ -28,7 +28,6 @@ export async function execute(
 		return;
 	} else {
     try {
-      await interaction.deferUpdate();
 			await handler.execute(client, interaction);
 		} catch (err) {
 			console.error('Failed to run command', err);

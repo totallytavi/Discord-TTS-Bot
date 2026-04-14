@@ -18,7 +18,7 @@ export const data = new SlashCommandBuilder()
 export const execute = async ({ interaction }: CommandContext) => {
 	const components: ActionRowBuilder<ButtonBuilder | StringSelectMenuBuilder>[] = [];
 	const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-		new ButtonBuilder().setLabel('Change nickname').setCustomId('nickname').setStyle(ButtonStyle.Primary),
+		new ButtonBuilder().setLabel('Change nickname').setCustomId('settings_nickname').setStyle(ButtonStyle.Primary),
 	);
 	components.push(buttonRow);
 

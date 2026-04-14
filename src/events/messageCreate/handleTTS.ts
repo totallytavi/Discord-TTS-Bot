@@ -14,7 +14,7 @@ export async function execute(client: TtsClient, message: Message<true>) {
 			return;
 		}
 
-		const [allowed, reason] = await connectCheck(message.guild, message.member.voice.channel);
+		const [allowed, reason] = await connectCheck(client, message.member.voice.channel);
     if (!allowed) {
       message.reply({ content: reason });
       return;
@@ -65,7 +65,7 @@ export async function execute(client: TtsClient, message: Message<true>) {
 		if (!connectionData) {
 			return;
 		} else {
-			connectionData.play(message);
+			connectionData.play(client, message);
 		}
 	}
 }

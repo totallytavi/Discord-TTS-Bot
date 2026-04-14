@@ -13,7 +13,7 @@ export const execute = async ({ client, interaction }: CommandContext) => {
 		return;
 	}
 
-	const [allowed, reason] = await connectCheck(interaction.guild, interaction.member.voice.channel);
+	const [allowed, reason] = await connectCheck(client, interaction.member.voice.channel);
 	if (!allowed) {
 		interaction.editReply({ content: reason });
 		return;

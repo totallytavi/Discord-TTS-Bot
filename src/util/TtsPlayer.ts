@@ -1,7 +1,15 @@
-import { AudioPlayer, AudioPlayerStatus, createAudioResource, entersState, VoiceConnection } from '@discordjs/voice';
-import { EventEmitter } from 'node:events';
+import {
+  type AudioPlayer,
+  AudioPlayerStatus,
+  createAudioResource,
+  entersState,
+  type VoiceConnection,
+} from '@discordjs/voice';
+import { Attachment, type Message } from 'discord.js';
 import { getAllAudioUrls } from 'google-tts-api';
-import { type Message } from 'discord.js';
+import { EventEmitter } from 'node:events';
+import { getSettings } from './helpers.js';
+import { type TtsClient } from './typings.js';
 
 /**
  * @classdesc A class used to perform text to speech for users in a voice channel. Uses an {@link EventEmitter} to manage the queue and playback of messages.
@@ -10,20 +18,27 @@ import { type Message } from 'discord.js';
 export class TtsPlayer extends EventEmitter {
 	/**
 	 * @private
+	 * @readonly
 	 * @desc The underlying audio player object
 	 */
-	private player: AudioPlayer;
+	private readonly player: AudioPlayer;
 	/**
 	 * @private
+	 * @readonly
 	 * @desc The underlying voice connection object
 	 */
-	private connection: VoiceConnection;
+	private readonly connection: VoiceConnection;
 	/**
 	 * @private
-	 * @desc List of messages to be played. New messages can be added using {@link }
+	 * @desc List of messages to be played. New messages can be added using {@link play()}
 	 */
-	// TODO: Consider changing this to a table that just contains the content, author ID, nickname, and lang to reduce storage needs and allow customization
-	private queue: Message<true>[] = [];
+	private queue: {
+		authorId: string;
+		content: string;
+		attachments: Map<unknown, Attachment>;
+		lang: string;
+		nick: string;
+	}[] = [];
 	/**
 	 * @private
 	 * @desc Whether the player is looping and playing TTS messages. Acts as a debounce
@@ -31,10 +46,11 @@ export class TtsPlayer extends EventEmitter {
 	private isPlaying = false;
 	/**
 	 * @private
+	 * @readonly
 	 * @see {@link TtsPlayer.stop()}
 	 * @desc Abort controller used to stop playback of TTS messages
 	 */
-	private controller = new AbortController();
+	private readonly controller = new AbortController();
 	/**
 	 * @private
 	 * @desc The ID of the last author read during TTS playback. Used to prevent saying "<username> said" repeatedly
@@ -44,19 +60,24 @@ export class TtsPlayer extends EventEmitter {
 	 * @public
 	 * @desc Channel ID for this TTS player
 	 */
-	public channelId: string;
+	set channelId(_newId: string) {
+		this.stop();
+	}
 
 	/**
 	 * @public
 	 * @desc Event emitted when a new message is added to the TTS queue. Automatically calls {@link playNext()} to play the message. Consider using {@link play()} to add messages, which is much simpler
 	 */
-	declare on: (eventName: 'messageCreate', listener: (message: Message<true>) => void) => this;
+	declare on: (
+		eventName: 'queueMessage',
+		listener: (client: TtsClient, message: Message<true>) => Promise<void>,
+	) => this;
 	/**
 	 * @public
 	 * @see {@link play()}
 	 * @desc Adds a new message to the TTS queue. Consider using {@link play()} instead, which is much simpler
 	 */
-	declare emit: (eventName: 'messageCreate', message: Message<true>) => boolean;
+	declare emit: (eventName: 'queueMessage', client: TtsClient, message: Message<true>) => boolean;
 
 	/**
 	 * Creates a new TTS player for a specific voice channel. Use {}
@@ -70,8 +91,8 @@ export class TtsPlayer extends EventEmitter {
 		this.player = player;
 		this.channelId = channelId;
 
-		this.on('messageCreate', (message) => {
-			this.queue.push(message);
+		this.on('queueMessage', async (client: TtsClient, message: Message<true>) => {
+			this.queue.push(await this.transformMessage(client, message));
 			this.playNext();
 		});
 		this.player.on('error', (error) => {
@@ -80,33 +101,66 @@ export class TtsPlayer extends EventEmitter {
 	}
 
 	/**
+	 * @async
 	 * @public
-	 * @desc Queues a message to be played by the TTS player. Messages will be played in the order received. Use {@link stop()} to stop all playback and clear the queue.
+	 * @desc Transforms a message to a message payload for the TTS player
+	 * @param {TtsClient} client Client with Sequelize data
+	 * @param {Message<true>} message Message to convert
+	 * @returns {Promise<TtsPlayer['queue'][number]>}
 	 */
-	public play(message: Message<true>) {
-		this.emit('messageCreate', message);
+	public async transformMessage(client: TtsClient, message: Message<true>): Promise<TtsPlayer['queue'][number]> {
+		const payload = {
+			authorId: message.author.id,
+			attachments: message.attachments,
+			nick: '',
+			lang: '',
+			content: '',
+		};
+
+		const settings = await getSettings(client, payload.authorId, message.guildId);
+		payload.nick = settings.nick || message.member?.displayName || message.author.displayName;
+		payload.lang = settings.lang || 'en-GB';
+
+		const mentions = message.mentions;
+		payload.content = message.cleanContent.replace(/<(.)(.+?)>/g, function (_, type: string, id: string) {
+			return type + (mentions.members.get(id) || mentions.channels.get(id) || mentions.roles.get(id) || id);
+		});
+		if (message.mentions.repliedUser) {
+			//? Is it worth it to get this user's preferred nickname? Or too much DB overhead?
+			payload.content = `Replying to ${message.mentions.repliedUser.displayName}: ${payload.content}`;
+		}
+
+		return payload;
 	}
 
 	/**
+	 * @public
+	 * @desc Queues a message to be played by the TTS player. Messages will be played in the order received. Use {@link stop()} to stop all playback and clear the queue.
+	 */
+	public play(client: TtsClient, message: Message<true>) {
+		this.emit('queueMessage', client, message);
+	}
+
+	/**
+   * @private
 	 * Generates the content to send to Google Translate TTS for playback
 	 * @param message Message to get the TTS content for
 	 */
 	private prepareContent(message: TtsPlayer['queue'][number]) {
 		let content = [];
 
-    // TODO: Map mentionables to their names
-		content.push(message.cleanContent.replaceAll(/<.+?>/g, '[mentionable]'));
+		content.push(message.content);
 
-		if (message.author.id !== this.lastAuthor) {
-			content.unshift(`${message.member!.displayName} said:`);
+		if (message.authorId !== this.lastAuthor) {
+			content.unshift(`${message.nick} said:`);
 		}
 
 		if (message.attachments.size > 0) {
-      //? Consider a better way to detect if we should
-      //? put "with"
-      if (message.cleanContent.length > 3) {
-        content.push('with:');
-      }
+			//? Consider a better way to detect if we should
+			//? put "with"
+			if (message.content.length > 3) {
+				content.push('with:');
+			}
 
 			for (const attachment of message.attachments.values()) {
 				if (attachment.contentType?.startsWith('audio/')) {
@@ -124,6 +178,7 @@ export class TtsPlayer extends EventEmitter {
 	}
 
 	/**
+   * @async
 	 * @private
 	 * @desc Plays the supplied URLs. Used internally by {@link playNext()} after generating the URLs
 	 */
@@ -143,6 +198,7 @@ export class TtsPlayer extends EventEmitter {
 	}
 
 	/**
+   * @async
 	 * @private
 	 * @see {@link play()}
 	 * @desc Plays the next queued TTS message. Will call itself as needed. Use {@link play()} to add messages to the queue
@@ -151,22 +207,14 @@ export class TtsPlayer extends EventEmitter {
 		if (this.isPlaying || this.queue.length === 0) return;
 
 		this.isPlaying = true;
-		const message = this.queue.shift()!;
-		// TODO: Move this whole block into a separate function to clean it up?
 		try {
+			const message = this.queue.shift()!;
 			const content = this.prepareContent(message);
 
-			let language = 'en-GB';
-			const langRole = message.member!.roles.cache.find((r) => r.name.startsWith('lang-'));
-			if (langRole && langRole.name.match(/^lang-([a-z]{2}-[A-Z]{2})$/)) {
-				// TODO: Add a property called ttsLang from a database
-				language = langRole.name.slice(5);
-			}
-
-			this.lastAuthor = message.author.id;
+			this.lastAuthor = message.authorId;
 			await this.playUrls(
 				getAllAudioUrls(content, {
-					lang: language,
+					lang: message.lang || 'en-GB',
 				}).map((obj) => obj.url),
 			);
 		} catch (err) {
@@ -178,6 +226,7 @@ export class TtsPlayer extends EventEmitter {
 	}
 
 	/**
+   * @async
 	 * @public
 	 * @desc Stops playback of all TTS messages
 	 */
@@ -188,6 +237,7 @@ export class TtsPlayer extends EventEmitter {
 	}
 
 	/**
+   * @async
 	 * @public
 	 * @desc Destroys the TTS player and performs cleanup
 	 * @param disconnect Whether to disconnect the connection.

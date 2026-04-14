@@ -23,9 +23,11 @@ Inspired by the original Discord TTS bot written in Rust, this project is an att
 | --- | --- |
 | TTS | Done & tested |
 | Auto reconnect | Done & tested |
-| User settings | Needs testing |
+| User settings | Done & tested |
 | Setting PWD to dist | Needs testing |
-| Mapping mentionables to human understandable | Needs implementation (Priority!) |
-| Pull nickname & language from DB on TTS | Needs implementation (Priority!) |
+| Mapping mentionables to human understandable | Done & tested |
+| Pull nickname & language from DB on TTS | Done & tested |
 | Server settings | Needs implementation |
 | Cleanup eslint and prettier | Needs implementation |
+| Fuzzing code for memory leaks | Needs review |
+| Checking for `playerMap` logical mistakes | Needs review |
