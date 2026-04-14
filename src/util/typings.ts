@@ -83,6 +83,10 @@ export const GTTS_LANGUAGES_MERGED = {
 	Danish: {
 		Denmark: 'da-DK',
 	},
+  // Not a real language, but exists for clueless users
+  Default: {
+    Default: 'en-GB'
+  },
 	Dutch: {
 		Belgium: 'nl-BE',
 		Netherlands: 'nl-NL',
