@@ -8,6 +8,9 @@ export async function execute(client: TtsClient, message: Message<true>) {
 	if (!message.member) return;
 	if (!message.channel.isVoiceBased()) return;
 
+  // Silence TTS on these messages
+  if (message.cleanContent.startsWith('-')) return;
+
 	if (message.content === 'join') {
 		if (!message.member?.voice.channel) {
 			await message.reply('Join a voice channel then try again!');

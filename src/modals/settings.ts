@@ -41,6 +41,9 @@ export async function execute(client: TtsClient, interaction: ModalSubmitInterac
 	});
 
 	try {
+    if (!userData.settings[guildId]) {
+      userData.settings[guildId] = {}
+    }
 		updateFunction(userData);
 		userData.changed('settings', true);
 		await userData.save();

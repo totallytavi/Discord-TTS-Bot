@@ -1,9 +1,10 @@
 import {
-  type AudioPlayer,
-  AudioPlayerStatus,
-  createAudioResource,
-  entersState,
-  type VoiceConnection,
+	type AudioPlayer,
+	AudioPlayerStatus,
+	createAudioResource,
+	entersState,
+	type VoiceConnection,
+	VoiceConnectionStatus,
 } from '@discordjs/voice';
 import { Attachment, type Message } from 'discord.js';
 import { getAllAudioUrls } from 'google-tts-api';
@@ -46,11 +47,10 @@ export class TtsPlayer extends EventEmitter {
 	private isPlaying = false;
 	/**
 	 * @private
-	 * @readonly
 	 * @see {@link TtsPlayer.stop()}
 	 * @desc Abort controller used to stop playback of TTS messages
 	 */
-	private readonly controller = new AbortController();
+	private controller = new AbortController();
 	/**
 	 * @private
 	 * @desc The ID of the last author read during TTS playback. Used to prevent saying "<username> said" repeatedly
@@ -92,7 +92,8 @@ export class TtsPlayer extends EventEmitter {
 		this.channelId = channelId;
 
 		this.on('queueMessage', async (client: TtsClient, message: Message<true>) => {
-			this.queue.push(await this.transformMessage(client, message));
+      const msg = await this.transformMessage(client, message);
+			this.queue.push(msg);
 			this.playNext();
 		});
 		this.player.on('error', (error) => {
@@ -123,12 +124,41 @@ export class TtsPlayer extends EventEmitter {
 
 		const mentions = message.mentions;
 		payload.content = message.cleanContent.replace(/<(.)(.+?)>/g, function (_, type: string, id: string) {
-			return type + (mentions.members.get(id) || mentions.channels.get(id) || mentions.roles.get(id) || id);
+			let transformed = type + (mentions.members.get(id) || mentions.channels.get(id) || mentions.roles.get(id) || 'mentionable');
+      // Try our best to render mentionables we don't understand
+      if (transformed.includes('mentionable')) {
+        switch(type) {
+        case '#': {
+          transformed = "#unknown-channel";
+          break;
+        }
+        case '&': {
+          transformed = "@unknown-role";
+          break;
+        }
+        case '@': {
+          transformed = "@Unknown Member";
+          break;
+        }
+        default: {
+          transformed = type + id;
+          break;
+        }
+        }
+      }
+      return transformed;
 		});
 		if (message.mentions.repliedUser) {
 			//? Is it worth it to get this user's preferred nickname? Or too much DB overhead?
 			payload.content = `Replying to ${message.mentions.repliedUser.displayName}: ${payload.content}`;
 		}
+
+    // Standard replacements to prevent stupid TTS
+		payload.content = payload.content
+      // https://stackoverflow.com/a/6041965
+			.replaceAll(/(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])/gs, 'a link')
+			.replaceAll(/```.+?```/gs, 'code block')
+      .replaceAll(/`.+?`/gs, 'code snippet');
 
 		return payload;
 	}
@@ -142,7 +172,7 @@ export class TtsPlayer extends EventEmitter {
 	}
 
 	/**
-   * @private
+	 * @private
 	 * Generates the content to send to Google Translate TTS for playback
 	 * @param message Message to get the TTS content for
 	 */
@@ -156,35 +186,21 @@ export class TtsPlayer extends EventEmitter {
 		}
 
 		if (message.attachments.size > 0) {
-			//? Consider a better way to detect if we should
-			//? put "with"
-			if (message.content.length > 3) {
-				content.push('with:');
-			}
-
-			for (const attachment of message.attachments.values()) {
-				if (attachment.contentType?.startsWith('audio/')) {
-					content.push(`an audio file named ${attachment.name},`);
-				} else {
-					content.push(`a file named ${attachment.name},`);
-				}
-			}
-			if (message.attachments.size > 1) {
-				content[content.length - 1] = content[content.length - 1]!.slice(0, -1) + ' and';
-			}
+			content.push(message.attachments.size === 1 ? 'a file' : 'multiple files');
 		}
 
 		return content.join(' ');
 	}
 
 	/**
-   * @async
+	 * @async
 	 * @private
 	 * @desc Plays the supplied URLs. Used internally by {@link playNext()} after generating the URLs
 	 */
 	private async playUrls(urls: string[]) {
 		while (urls.length > 0) {
 			const url = urls.shift()!;
+      this.controller = new AbortController();
 			this.player.play(createAudioResource(url));
 			await entersState(this.player, AudioPlayerStatus.Idle, this.controller.signal).catch((err) => {
 				if (err.name === 'AbortError') {
@@ -198,7 +214,7 @@ export class TtsPlayer extends EventEmitter {
 	}
 
 	/**
-   * @async
+	 * @async
 	 * @private
 	 * @see {@link play()}
 	 * @desc Plays the next queued TTS message. Will call itself as needed. Use {@link play()} to add messages to the queue
@@ -208,25 +224,26 @@ export class TtsPlayer extends EventEmitter {
 
 		this.isPlaying = true;
 		try {
-			const message = this.queue.shift()!;
-			const content = this.prepareContent(message);
-
-			this.lastAuthor = message.authorId;
-			await this.playUrls(
-				getAllAudioUrls(content, {
-					lang: message.lang || 'en-GB',
-				}).map((obj) => obj.url),
-			);
+      while (this.queue.length > 0) {
+        const message = this.queue.shift()!;
+        const content = this.prepareContent(message);
+  
+        this.lastAuthor = message.authorId;
+        await this.playUrls(
+          getAllAudioUrls(content, {
+            lang: message.lang || 'en-GB',
+          }).map((obj) => obj.url),
+        );
+      }
 		} catch (err) {
 			console.error('Failed to play TTS message:', err);
-		}
-
-		this.isPlaying = false;
-		this.playNext();
+		} finally {
+      this.isPlaying = false;
+    }
 	}
 
 	/**
-   * @async
+	 * @async
 	 * @public
 	 * @desc Stops playback of all TTS messages
 	 */
@@ -237,7 +254,7 @@ export class TtsPlayer extends EventEmitter {
 	}
 
 	/**
-   * @async
+	 * @async
 	 * @public
 	 * @desc Destroys the TTS player and performs cleanup
 	 * @param disconnect Whether to disconnect the connection.
@@ -245,8 +262,12 @@ export class TtsPlayer extends EventEmitter {
 	 */
 	public async destroy(disconnect = true) {
 		await this.stop();
-		if (disconnect) {
-			this.connection.disconnect();
+		if (!disconnect) {
+			return;
+		}
+
+		this.connection.disconnect();
+		if (this.connection.state.status !== VoiceConnectionStatus.Destroyed) {
 			this.connection.destroy(false);
 		}
 	}

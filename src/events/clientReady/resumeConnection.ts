@@ -9,6 +9,10 @@ export async function execute(client: TtsClient) {
 
 	const connections = JSON.parse(readFileSync(process.env.CONNECTION_PATH!, 'utf-8')) as string[];
 	for (const channelId of connections) {
+    if (!channelId) {
+      continue;
+    }
+
 		const channel = await client.channels.fetch(channelId);
 		if (!channel || !channel.isVoiceBased()) {
 			continue;
