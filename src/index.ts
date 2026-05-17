@@ -1,5 +1,6 @@
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, GatewayIntentBits, Status } from 'discord.js';
 import { readdirSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http2';
 import process from 'node:process';
 import { Sequelize } from 'sequelize';
 import { initModels } from './models/init-models.js';
@@ -28,7 +29,7 @@ const sequelize = new Sequelize({
 	database: process.env.DB_DATABASE!,
 	port: Number(process.env.DB_PORT),
 	dialect: 'mysql',
-  logging: process.env.DB_LOGGING === 'true'
+	logging: process.env.DB_LOGGING === 'true',
 });
 client.playerMap = new Map<string, TtsPlayer>();
 client.sequelize = sequelize as unknown as (typeof client)['sequelize'];
@@ -58,8 +59,8 @@ process.on('SIGINT', async () => {
 	const channels = [];
 	for (const player of client.playerMap.values()) {
 		channels.push(player.channelId);
-    // Don't destroy so a brief restart won't be noticed
-    // by users. Memory cleanup is handled on exit
+		// Don't destroy so a brief restart won't be noticed
+		// by users. Memory cleanup is handled on exit
 		await player.destroy(false);
 	}
 	client.playerMap.clear();
@@ -70,3 +71,51 @@ process.on('SIGINT', async () => {
 
 console.info(`Token: ${process.env.TOKEN?.slice(0, 10)}...`);
 await client.login(process.env.TOKEN);
+
+// HTTP server for Docker
+createServer((req, res) => {
+	const path = req.url.toLowerCase().split('?')[0]?.trim();
+
+	switch (path) {
+		case '/ping': {
+			res.writeHead(200, {
+				'content-type': 'application/json',
+			});
+			res.write(
+				JSON.stringify({
+					success: true,
+					data: client.ws.ping,
+				}),
+			);
+			break;
+		}
+		case '/heartbeat': {
+			if (client.token !== null && client.ws.status !== Status.Disconnected) {
+				res.writeHead(204);
+			} else {
+				res.writeHead(500);
+				res.write(
+					JSON.stringify({
+						success: false,
+						data: 'Client is not logged in',
+					}),
+				);
+			}
+			break;
+		}
+		default: {
+			res.writeHead(404, {
+				'content-type': 'application/json',
+			});
+			res.write(
+				JSON.stringify({
+					sucess: false,
+					data: 'Unknown path',
+				}),
+			);
+			break;
+		}
+	}
+
+	res.end();
+}).listen(8080);

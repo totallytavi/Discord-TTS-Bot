@@ -8,8 +8,8 @@ export async function execute(client: TtsClient, message: Message<true>) {
 	if (!message.member) return;
 	if (!message.channel.isVoiceBased()) return;
 
-  // Silence TTS on these messages
-  if (message.cleanContent.startsWith('-')) return;
+	// Silence TTS on these messages
+	if (message.cleanContent.startsWith('-')) return;
 
 	if (message.content === 'join') {
 		if (!message.member?.voice.channel) {
@@ -18,10 +18,10 @@ export async function execute(client: TtsClient, message: Message<true>) {
 		}
 
 		const [allowed, reason] = await connectCheck(client, message.member.voice.channel);
-    if (!allowed) {
-      message.reply({ content: reason });
-      return;
-    }
+		if (!allowed) {
+			message.reply({ content: reason });
+			return;
+		}
 
 		try {
 			await startVoiceCall(client, message.member.voice.channel);
@@ -37,6 +37,11 @@ export async function execute(client: TtsClient, message: Message<true>) {
 	}
 
 	if (!message.member.voice || !message.member.voice.channel) {
+		return;
+	}
+
+	// Block server muted members from speaking
+	if (message.member.voice.serverMute) {
 		return;
 	}
 

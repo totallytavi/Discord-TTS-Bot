@@ -1,0 +1,9 @@
+.env
+.gitignore
+.github
+.git/
+.vs_code/
+tsconfig.tsbuildinfo
+dist
+node_modules
+connections.json
