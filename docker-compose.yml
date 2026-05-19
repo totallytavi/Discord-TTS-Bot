@@ -7,7 +7,7 @@ services:
     healthcheck:
       test: [
         "CMD-SHELL",
-        "curl -f http://localhost:8080/healthcheck -A 'curl/some-version (+healthcheck)'"
+        "curl -f http://localhost:8080/heartbeat -A 'curl/some-version (+healthcheck)'"
       ]
       interval: 15s
       timeout: 5s
