@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, Status } from 'discord.js';
 import { readdirSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http2';
+import { createServer } from 'node:http';
 import process from 'node:process';
 import { Sequelize } from 'sequelize';
 import { initModels } from './models/init-models.js';
@@ -74,48 +74,61 @@ await client.login(process.env.TOKEN);
 
 // HTTP server for Docker
 createServer((req, res) => {
-	const path = req.url.toLowerCase().split('?')[0]?.trim();
+	if (!req.url) {
+		res.writeHead(400, {
+			'content-type': 'application/json',
+		});
+		res.end(
+			JSON.stringify({
+				success: false,
+				data: 'Malformed URL',
+			}),
+		);
+		return;
+	}
 
-	switch (path) {
+	switch (req.url.toLowerCase().split('?')[0]?.trim()) {
 		case '/ping': {
 			res.writeHead(200, {
 				'content-type': 'application/json',
 			});
-			res.write(
+			res.end(
 				JSON.stringify({
 					success: true,
 					data: client.ws.ping,
 				}),
 			);
-			break;
+			return;
 		}
 		case '/heartbeat': {
 			if (client.token !== null && client.ws.status !== Status.Disconnected) {
 				res.writeHead(204);
-			} else {
-				res.writeHead(500);
-				res.write(
-					JSON.stringify({
-						success: false,
-						data: 'Client is not logged in',
-					}),
-				);
+				res.end();
+				return;
 			}
-			break;
+
+			res.writeHead(500, {
+				'content-type': 'application/json',
+			});
+			res.end(
+				JSON.stringify({
+					success: false,
+					data: 'Client is not logged in',
+				}),
+			);
+			return;
 		}
 		default: {
 			res.writeHead(404, {
 				'content-type': 'application/json',
 			});
-			res.write(
+			res.end(
 				JSON.stringify({
-					sucess: false,
+					success: false,
 					data: 'Unknown path',
 				}),
 			);
-			break;
+			return;
 		}
 	}
-
-	res.end();
 }).listen(8080);
