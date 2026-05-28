@@ -13,9 +13,12 @@ This is the preferred installation method, as it handles a lot of the heavy lift
 1. Install and setup Docker and MySQL
 2. Clone the repository
 3. Copy the `.env.example` to `.env`
-4. Fill out the variables (Use `host.docker.internal` to access localhost)
-5. `docker compose build`
-6. `docker compose up -d`
+4. Put the absolute path to your `.env` file in your environment variables as `envFile`
+  - [Absolute and Relative Pathnames in Linux - GeeksforGeeks](https://www.geeksforgeeks.org/linux-unix/absolute-relative-pathnames-unix/)
+  - [How do I add a variable to my environment variables](https://letmegooglethat.com/?q=How+do+I+add+a+variable+to+my+environment+variables)
+5. Fill out the variables (Use `host.docker.internal` to access localhost)
+6. `docker compose build`
+7. `docker compose up -d`
 
 ### Pure Installation
 For those wishing to contribute or prefer a manual installation, this option is available for your use.
