@@ -2,11 +2,14 @@
 FROM node:24.14.0 AS builder
 WORKDIR /usr/src/Discord-TTS-Bot
 
-COPY package.json package-lock.json tsconfig.json ./
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY src ./src
 
-RUN npm install
-RUN npm run build
+RUN pnpm install
+RUN pnpm run build
+RUN pnpm prune --prod
 
 # ffmpeg
 FROM node:24.14.0-slim AS runner
@@ -16,10 +19,11 @@ RUN apt update && \
     apt install -y ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/src/Discord-TTS-Bot/package.json ./
 COPY --from=builder /usr/src/Discord-TTS-Bot/node_modules ./node_modules
 COPY --from=builder /usr/src/Discord-TTS-Bot/dist ./dist
+COPY --from=builder /usr/src/Discord-TTS-Bot/package.json ./
 
 ENV NODE_ENV=production
+USER node
 
 CMD [ "npm", "start", "--ignore-scripts" ]

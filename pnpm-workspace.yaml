@@ -1,2 +1,2 @@
-onlyBuiltDependencies:
-  - '@discordjs/opus'
+allowBuilds:
+  '@discordjs/opus': true
