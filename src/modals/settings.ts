@@ -27,7 +27,7 @@ export async function execute(client: TtsClient, interaction: ModalSubmitInterac
         .match(/[0-9](\.[0-9])?/) || ["1.00"];
       let [num, decimal] = Number(userInput[0]).toFixed(2).split('.').map(Number);
       num = Math.max(Math.min(num!, 1), 0)
-      decimal = num === 1 ? Math.min(num, 25) : Math.max(num, 25);
+      decimal = num === 1 ? Math.min(decimal!, 25) : Math.max(decimal!, 25);
       userData.settings[guildId]!.volume = Number(num + '.' + decimal);
     }
 	} as Record<string, (userData: user) => void>;
