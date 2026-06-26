@@ -19,6 +19,10 @@ export interface userSettings {
 	 * Preferred language of the user
 	 */
 	lang?: string;
+  /**
+   * A number between 0.25 and 1.25
+   */
+  volume?: number;
 }
 
 export type userPk = 'userId';

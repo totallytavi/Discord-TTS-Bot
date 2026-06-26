@@ -7,6 +7,7 @@ import { initModels } from './models/init-models.js';
 import { fsRelativeDir, relativeDir } from './util/helpers.js';
 import { type TtsPlayer } from './util/TtsPlayer.js';
 import { TtsClient } from './util/typings.js';
+import { createClient } from 'redis';
 
 await import('dotenv').then((dotenv) => dotenv.config());
 
@@ -34,6 +35,16 @@ const sequelize = new Sequelize({
 client.playerMap = new Map<string, TtsPlayer>();
 client.sequelize = sequelize as unknown as (typeof client)['sequelize'];
 client.commands = new Map();
+
+try {
+  client.redis = createClient({
+    url: process.env.REDIS_URL!,
+    username: process.env.REDIS_USERNAME!,
+    password: process.env.REDIS_PASSWORD!
+  });
+} catch (err) {
+  console.warn("Redis failed to connect, no caching will be done", String(err));
+}
 
 try {
 	await sequelize.authenticate();
@@ -131,4 +142,4 @@ createServer((req, res) => {
 			return;
 		}
 	}
-}).listen(8080);
+}).listen(process.env.HC_PORT || 8080);

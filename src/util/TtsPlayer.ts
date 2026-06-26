@@ -11,12 +11,22 @@ import { getAllAudioUrls } from 'google-tts-api';
 import { EventEmitter } from 'node:events';
 import { getSettings } from './helpers.js';
 import { type TtsClient } from './typings.js';
+import { fetchUrl } from './proxy.js';
+import { type createClient } from 'redis';
+import { Readable } from 'node:stream';
 
+type TtsRedisClient = ReturnType<typeof createClient>;
 /**
  * @classdesc A class used to perform text to speech for users in a voice channel. Uses an {@link EventEmitter} to manage the queue and playback of messages.
  * @see {@link TtsPlayer.play()} to add messages to the queue
  */
 export class TtsPlayer extends EventEmitter {
+	/**
+	 * @private
+	 * @readonly
+	 * @desc Redis client for caching
+	 */
+	private readonly redis: TtsRedisClient | undefined;
 	/**
 	 * @private
 	 * @readonly
@@ -39,6 +49,7 @@ export class TtsPlayer extends EventEmitter {
 		attachments: Map<unknown, Attachment>;
 		lang: string;
 		nick: string;
+    volume: number;
 	}[] = [];
 	/**
 	 * @private
@@ -85,14 +96,15 @@ export class TtsPlayer extends EventEmitter {
 	 * @param connection Voice connection object
 	 * @param player Audio player object
 	 */
-	constructor(channelId: string, connection: VoiceConnection, player: AudioPlayer) {
+	constructor(channelId: string, connection: VoiceConnection, player: AudioPlayer, redis?: TtsRedisClient) {
 		super();
+		this.redis = redis;
 		this.connection = connection;
 		this.player = player;
 		this.channelId = channelId;
 
 		this.on('queueMessage', async (client: TtsClient, message: Message<true>) => {
-      const msg = await this.transformMessage(client, message);
+			const msg = await this.transformMessage(client, message);
 			this.queue.push(msg);
 			this.playNext();
 		});
@@ -116,49 +128,52 @@ export class TtsPlayer extends EventEmitter {
 			nick: '',
 			lang: '',
 			content: '',
+      volume: 1.0
 		};
 
 		const settings = await getSettings(client, payload.authorId, message.guildId);
 		payload.nick = settings.nick || message.member?.displayName || message.author.displayName;
 		payload.lang = settings.lang || 'en-GB';
+    payload.volume = settings.volume || 1;
 
 		const mentions = message.mentions;
 		payload.content = message.cleanContent.replace(/<(.)(.+?)>/g, function (_, type: string, id: string) {
-			let transformed = type + (mentions.members.get(id) || mentions.channels.get(id) || mentions.roles.get(id) || 'mentionable');
-      // Try our best to render mentionables we don't understand
-      if (transformed.includes('mentionable')) {
-        switch(type) {
-        case '#': {
-          transformed = "#unknown-channel";
-          break;
-        }
-        case '&': {
-          transformed = "@unknown-role";
-          break;
-        }
-        case '@': {
-          transformed = "@Unknown Member";
-          break;
-        }
-        default: {
-          transformed = type + id;
-          break;
-        }
-        }
-      }
-      return transformed;
+			let transformed =
+				type + (mentions.members.get(id) || mentions.channels.get(id) || mentions.roles.get(id) || 'mentionable');
+			// Try our best to render mentionables we don't understand
+			if (transformed.includes('mentionable')) {
+				switch (type) {
+					case '#': {
+						transformed = '#unknown-channel';
+						break;
+					}
+					case '&': {
+						transformed = '@unknown-role';
+						break;
+					}
+					case '@': {
+						transformed = '@Unknown Member';
+						break;
+					}
+					default: {
+						transformed = type + id;
+						break;
+					}
+				}
+			}
+			return transformed;
 		});
 		if (message.mentions.repliedUser) {
 			//? Is it worth it to get this user's preferred nickname? Or too much DB overhead?
 			payload.content = `Replying to ${message.mentions.repliedUser.displayName}: ${payload.content}`;
 		}
 
-    // Standard replacements to prevent stupid TTS
+		// Standard replacements to prevent stupid TTS
 		payload.content = payload.content
-      // https://stackoverflow.com/a/6041965
+			// https://stackoverflow.com/a/6041965
 			.replaceAll(/(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])/gs, 'a link')
 			.replaceAll(/```.+?```/gs, 'code block')
-      .replaceAll(/`.+?`/gs, 'code snippet');
+			.replaceAll(/`.+?`/gs, 'code snippet');
 
 		return payload;
 	}
@@ -197,19 +212,32 @@ export class TtsPlayer extends EventEmitter {
 	 * @private
 	 * @desc Plays the supplied URLs. Used internally by {@link playNext()} after generating the URLs
 	 */
-	private async playUrls(urls: string[]) {
+	private async playUrls(urls: string[], volume: number) {
 		while (urls.length > 0) {
-			const url = urls.shift()!;
+      const url = urls.shift()!;
       this.controller = new AbortController();
-			this.player.play(createAudioResource(url));
-			await entersState(this.player, AudioPlayerStatus.Idle, this.controller.signal).catch((err) => {
-				if (err.name === 'AbortError') {
-					urls.length = 0;
-					return Promise.resolve();
-				} else {
-					return Promise.reject(err);
-				}
-			});
+			await fetchUrl(url, this.redis)
+				.then((buff) => {
+					if (!buff) return new Readable();
+					else return Readable.from(buff);
+				})
+				.then((stream) => createAudioResource(stream, { inlineVolume: volume !== 1 }))
+        .then((resource) => {
+          if (volume === 1) return resource;
+          resource.volume!.setVolume(volume)
+          return resource;
+        })
+				.then((resource) => this.player.play(resource))
+				.then(() =>
+					entersState(this.player, AudioPlayerStatus.Idle, this.controller.signal).catch((err) => {
+						if (err.name === 'AbortError') {
+							urls.length = 0;
+							return Promise.resolve();
+						} else {
+							return Promise.reject(err);
+						}
+					}),
+				);
 		}
 	}
 
@@ -224,22 +252,23 @@ export class TtsPlayer extends EventEmitter {
 
 		this.isPlaying = true;
 		try {
-      while (this.queue.length > 0) {
-        const message = this.queue.shift()!;
-        const content = this.prepareContent(message);
-  
-        this.lastAuthor = message.authorId;
-        await this.playUrls(
-          getAllAudioUrls(content, {
-            lang: message.lang || 'en-GB',
-          }).map((obj) => obj.url),
-        );
-      }
+			while (this.queue.length > 0) {
+				const message = this.queue.shift()!;
+				const content = this.prepareContent(message);
+
+				this.lastAuthor = message.authorId;
+				await this.playUrls(
+					getAllAudioUrls(content, {
+						lang: message.lang || 'en-GB',
+					}).map((obj) => obj.url),
+          message.volume || 1,
+				);
+			}
 		} catch (err) {
 			console.error('Failed to play TTS message:', err);
 		} finally {
-      this.isPlaying = false;
-    }
+			this.isPlaying = false;
+		}
 	}
 
 	/**
