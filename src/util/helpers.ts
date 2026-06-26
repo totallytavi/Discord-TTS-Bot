@@ -70,7 +70,7 @@ export async function startVoiceCall(client: TtsClient, channel: VoiceBasedChann
 
 	const player = createAudioPlayer();
 	connection.subscribe(player);
-	client.playerMap.set(channel.id, new TtsPlayer(channel.id, connection, player));
+	client.playerMap.set(channel.id, new TtsPlayer(channel.id, connection, player, client.redis));
 
 	return connection;
 }
@@ -147,6 +147,19 @@ export async function connectCheck(client: TtsClient, channel: VoiceBasedChannel
 		}
 	}
 }
+
+// Source - https://stackoverflow.com/a/71684122
+// Posted by anthumchris, modified by community. See post 'Timeline' for change history
+// Retrieved 2026-06-26, License - CC BY-SA 4.0
+export function ReadableBufferStream(ab: ArrayBuffer) {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(ab)
+      controller.close()
+    }
+  })
+}
+
 
 /**
  * Converts a relative directory to a well formatted path for node:fs.

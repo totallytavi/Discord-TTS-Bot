@@ -14,6 +14,7 @@ jobs:
     runs-on: mainserver-pez
     env:
       envFile: ${{ secrets.ENV_FILE }}
+      HC_PORT: ${{ secrets.HC_PORT }}
 
     steps:
       - uses: actions/checkout@v3

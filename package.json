@@ -6,22 +6,24 @@
 		"dotenv": "17.4.2",
 		"google-tts-api": "2.0.2",
 		"mysql2": "3.22.3",
+		"redis": "6.0.0",
 		"sequelize": "6.37.8",
-		"typescript": "6.0.3"
+		"typescript": "6.0.3",
+		"undici": "8.3.0"
 	},
 	"devDependencies": {
 		"@types/node": "25.9.0",
 		"eslint": "10.4.0",
 		"prettier": "3.8.3"
 	},
-  "scripts": {
-    "test": "npx tsc -b && node dist/index.js",
-    "build": "npx tsc -b",
-    "prestart": "npx tsc -b",
-    "start": "cd dist && node index.js",
-    "lint": "npx eslint --fix ./",
-    "setup": "cd assets && mkdir logs && mkdir ssl && cd ../",
-    "clean": "rm -r dist/*"
-  },
+	"scripts": {
+		"test": "npx tsc -b && node dist/index.js",
+		"build": "npx tsc -b",
+		"prestart": "npx tsc -b",
+		"start": "cd dist && node index.js",
+		"lint": "npx eslint --fix ./",
+		"setup": "cd assets && mkdir logs && mkdir ssl && cd ../",
+		"clean": "rm -r dist/*"
+	},
 	"type": "module"
 }

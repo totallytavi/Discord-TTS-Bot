@@ -19,6 +19,7 @@ export const execute = async ({ client, interaction }: CommandContext) => {
 	const components: ActionRowBuilder<ButtonBuilder | StringSelectMenuBuilder>[] = [];
 	const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
 		new ButtonBuilder().setLabel('Change nickname').setCustomId('settings_nickname').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setLabel('Change volume').setCustomId('settings_volume').setStyle(ButtonStyle.Secondary)
 	);
 	components.push(buttonRow);
 
@@ -50,6 +51,10 @@ export const execute = async ({ client, interaction }: CommandContext) => {
 					name: 'Language',
 					value: settings.lang || 'en-GB',
 				},
+        {
+          name: 'Volume',
+          value: settings.volume ? String(settings.volume) : '1'
+        }
 			)
 			.setTimestamp();
 

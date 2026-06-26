@@ -2,6 +2,7 @@ import { ChatInputCommandInteraction, Client, SlashCommandBuilder } from 'discor
 import { TtsPlayer } from './TtsPlayer.js';
 import { Sequelize } from 'sequelize';
 import { type initModels } from '../models/init-models.js';
+import { type createClient } from 'redis';
 
 /**
  * @desc Interface that extends the {@link Client discord.js Client} for this project's needs
@@ -33,6 +34,10 @@ export interface TtsClient extends Client {
 			execute: (context: CommandContext) => Promise<void>;
 		}
 	>;
+  /**
+   * @desc Redis client for caching
+   */
+  redis?: ReturnType<typeof createClient>;
 }
 
 /**

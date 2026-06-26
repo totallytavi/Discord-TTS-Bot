@@ -21,6 +21,15 @@ export async function execute(client: TtsClient, interaction: ModalSubmitInterac
 		language: (userData: user) => {
 			userData.settings[guildId]!.lang = interaction.fields.getStringSelectValues(field.customId)[0] || 'en-GB';
 		},
+    volume: (userData: user) => {
+      const userInput = interaction.fields
+				.getTextInputValue(field.customId)
+        .match(/[0-9](\.[0-9])?/) || ["1.00"];
+      let [num, decimal] = Number(userInput[0]).toFixed(2).split('.').map(Number);
+      num = Math.max(Math.min(num!, 1), 0)
+      decimal = num < 1 ? Math.max(num, 25) : Math.min(num, 25);
+      userData.settings[guildId]!.volume = Number(num + '.' + decimal);
+    }
 	} as Record<string, (userData: user) => void>;
 
 	const updateFunction = settings[field.customId];
@@ -63,6 +72,10 @@ export async function execute(client: TtsClient, interaction: ModalSubmitInterac
             name: 'Language',
             value: userSettings.lang || 'en-GB',
           },
+          {
+            name: 'Volume',
+            value: userSettings.volume ? String(userSettings.volume) : '1'
+          }
         )
         .setTimestamp();
 

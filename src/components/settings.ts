@@ -33,15 +33,29 @@ export async function execute(
 			.setStringSelectMenuComponent(dropdown);
 
 		modal.setTitle('Language Dialect Selection').setCustomId('settings_language');
-	} else if (interaction.isButton() && interaction.customId.endsWith('nickname')) {
-		const input = new TextInputBuilder()
-			.setCustomId('nickname')
-			.setMaxLength(32)
-			.setStyle(TextInputStyle.Short)
-			.setRequired(false);
+	} else if (interaction.isButton()) {
+		if (interaction.customId.endsWith('nickname')) {
+			const input = new TextInputBuilder()
+				.setCustomId('nickname')
+				.setMaxLength(32)
+				.setStyle(TextInputStyle.Short)
+				.setRequired(false);
 
-		label.setLabel('Enter your nickname').setDescription('Leave it blank to reset').setTextInputComponent(input);
-		modal.setTitle('Nickname Selection').setCustomId('settings_nickname');
+			label.setLabel('Enter your nickname').setDescription('Leave it blank to reset').setTextInputComponent(input);
+			modal.setTitle('Nickname Selection').setCustomId('settings_nickname');
+		} else if (interaction.customId.endsWith('volume')) {
+			const input = new TextInputBuilder()
+				.setCustomId('volume')
+				.setMaxLength(32)
+				.setStyle(TextInputStyle.Short)
+				.setRequired(false);
+
+			label
+				.setLabel('Enter your preferred volume')
+				.setDescription('Leave it blank to reset (Must bet between 0.25 and 1.25)')
+				.setTextInputComponent(input);
+			modal.setTitle('Volume Selection').setCustomId('settings_volume');
+		}
 	}
 
 	modal.setLabelComponents(label);
