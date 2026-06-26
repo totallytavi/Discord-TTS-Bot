@@ -4,10 +4,12 @@ WORKDIR /usr/src/Discord-TTS-Bot
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY tsconfig.json ./
 COPY src ./src
 
-RUN pnpm install
 RUN pnpm run build
 RUN pnpm prune --prod
 
