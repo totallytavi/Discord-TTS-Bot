@@ -41,7 +41,9 @@ export async function connectToChannel(channel: VoiceBasedChannel) {
 		 * sure to destroy it, and propagate the error by throwing it, so that the calling function
 		 * is aware that we failed to connect to the channel.
 		 */
-		connection.destroy();
+    if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
+      connection.destroy();
+    }
 
 		throw error;
 	}

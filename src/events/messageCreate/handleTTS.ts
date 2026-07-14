@@ -1,6 +1,13 @@
-import { Message } from 'discord.js';
+import { Message, TextBasedChannel } from 'discord.js';
 import { TtsClient } from '../../util/typings.js';
 import { connectCheck, startVoiceCall } from '../../util/helpers.js';
+
+async function send(channel: TextBasedChannel, content: string): Promise<Message | void> {
+	if (!channel.isTextBased()) return;
+	if (!channel.isSendable()) return;
+
+	return channel.send({ content }).catch((error) => console.error('Failed to safely send message', error));
+}
 
 export async function execute(client: TtsClient, message: Message<true>) {
 	if (message.author.bot) return;
@@ -13,24 +20,26 @@ export async function execute(client: TtsClient, message: Message<true>) {
 
 	if (message.content === 'join') {
 		if (!message.member?.voice.channel) {
-			await message.reply('Join a voice channel then try again!');
+			send(message.channel, 'Join a voice channel then try again!');
 			return;
 		}
 
 		const [allowed, reason] = await connectCheck(client, message.member.voice.channel);
 		if (!allowed) {
-			message.reply({ content: reason });
+			send(message.channel, reason);
 			return;
 		}
 
 		try {
 			await startVoiceCall(client, message.member.voice.channel);
-			await message.reply('TTS bot connected and ready');
+			await send(message.channel, 'TTS bot connected and ready');
+			await send(message.channel, 'Text-based commands are being deprecated. Please use slash commands instead (/join)');
 		} catch (error) {
 			/**
 			 * Unable to connect to the voice channel within 30 seconds :(
 			 */
 			console.error(error);
+			await send(message.channel, 'Failed to connect. Please try again later');
 		}
 
 		return;
@@ -47,27 +56,29 @@ export async function execute(client: TtsClient, message: Message<true>) {
 
 	if (message.content === 'leave') {
 		if (!message.member.voice.channel) {
-			await message.reply('Join a voice channel then try again!');
+			await send(message.channel, 'Join a voice channel then try again!');
 			return;
 		}
 
 		const connectionData = client.playerMap.get(message.member.voice.channelId!);
 		if (!connectionData) {
-			await message.reply('I am not connected to your voice channel!');
+			await send(message.channel, 'I am not connected to your voice channel!');
 			return;
 		}
 
-		connectionData.destroy();
+		await connectionData.destroy();
 		client.playerMap.delete(message.member.voice.channelId!);
 
-		await message.reply('TTS bot disconnected');
+		await send(message.channel, 'TTS bot disconnected');
+		await send(message.channel, 'Text-based commands are being deprecated. Please use slash commands instead (/leave)');
 	} else if (message.content === 'stop') {
 		const connectionData = client.playerMap.get(message.member.voice.channelId!);
 		if (!connectionData) {
 			return;
 		} else {
-			connectionData.stop();
+			await connectionData.stop();
 		}
+		await send(message.channel, 'Text-based commands are being deprecated. Please use slash commands instead (/stop)');
 	} else {
 		const connectionData = client.playerMap.get(message.member.voice.channelId!);
 		if (!connectionData) {

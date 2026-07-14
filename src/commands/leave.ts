@@ -20,7 +20,16 @@ export const execute = async ({ client, interaction }: CommandContext) => {
 
 	if (!client.playerMap.has(interaction.member.voice.channelId!)) {
     await interaction.editReply({ content: "Something went wrong, I should disconnect shortly" });
-    await botMember.voice.setChannel(null, "Unmanaged voice conection");
+    // Attempt to forcefully disconnect ourselves
+    interaction.guild.shard.send({
+      op: 4,
+      d: {
+        guild_id: interaction.guildId,
+        channel_id: null,
+        self_mute: false,
+        self_deaf: false
+      }
+    });
     return;
   }
 
@@ -28,7 +37,7 @@ export const execute = async ({ client, interaction }: CommandContext) => {
     await client.playerMap.get(interaction.member.voice.channelId!)!.destroy();
     client.playerMap.delete(interaction.member.voice.channelId!);
 
-    interaction.editReply({ content: 'Disconnected from voice channel!' });
+    await interaction.editReply({ content: 'Disconnected from voice channel!' });
   } catch (error) {
     console.error('Error destroying player:', error);
     await interaction.editReply({ content: 'Failed to disconnect from the voice channel' });
