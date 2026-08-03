@@ -9,7 +9,7 @@
 		"redis": "6.0.0",
 		"sequelize": "6.37.8",
 		"typescript": "6.0.3",
-		"undici": "8.3.0"
+		"undici": "8.9.0"
 	},
 	"devDependencies": {
 		"@types/node": "25.9.0",
