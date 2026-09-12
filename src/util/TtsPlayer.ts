@@ -111,6 +111,9 @@ export class TtsPlayer extends EventEmitter {
 		this.player.on('error', (error) => {
 			console.error('Audio player error:', error);
 		});
+    this.connection.on('error', (error) => {
+      console.error("VoiceConnection error:", String(error));
+    });
 	}
 
 	/**
@@ -230,7 +233,7 @@ export class TtsPlayer extends EventEmitter {
 				.then((resource) => this.player.play(resource))
 				.then(() =>
 					entersState(this.player, AudioPlayerStatus.Idle, this.controller.signal).catch((err) => {
-						if (err.name === 'AbortError') {
+						if (String(err).includes("AbortError")) {
 							urls.length = 0;
 							return Promise.resolve();
 						} else {
@@ -256,13 +259,21 @@ export class TtsPlayer extends EventEmitter {
 				const message = this.queue.shift()!;
 				const content = this.prepareContent(message);
 
+        if (!content || typeof(content) !== "string") {
+          console.warn("Message content was not a string", JSON.stringify(message));
+          continue;
+        }
+
 				this.lastAuthor = message.authorId;
 				await this.playUrls(
 					getAllAudioUrls(content, {
 						lang: message.lang || 'en-GB',
 					}).map((obj) => obj.url),
           message.volume || 1,
-				);
+				)
+          .catch((err) => {
+            console.warn("Uncaught error in playNext()", String(err));
+          });
 			}
 		} catch (err) {
 			console.error('Failed to play TTS message:', err);
