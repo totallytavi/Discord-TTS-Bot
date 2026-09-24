@@ -1,39 +1,44 @@
-import { VoiceState } from "discord.js";
-import { TtsClient } from "../../util/typings.js";
+import { VoiceState } from 'discord.js';
+import { TtsClient } from '../../util/typings.js';
 
-export async function execute(client: TtsClient, oldState: VoiceState, _newState: VoiceState) {
-  const botChannel = oldState.guild.members.me!.voice.channel
-  // TODO: Add auto-join functionality within srv_config?
-  if (!oldState.channel || !oldState.member) {
-    return;
-  }
+export async function execute(client: TtsClient, oldState: VoiceState, newState: VoiceState) {
+	const oldChannel = oldState.channel;
+	// TODO: Add auto-join functionality within srv_config?
+	if (!oldChannel || !oldState.member) {
+		return;
+	}
 
-  if (oldState.member.id === client.user!.id) {
-    const player = client.playerMap.get(oldState.channel.id);
-    if (!player) {
+	if (oldState.member.id === client.user!.id) {
+		const player = client.playerMap.get(oldState.channel.id);
+		if (!player) {
+			return;
+		}
+
+		if (!newState.channelId) {
+      void player.destroy();
       return;
     }
 
-    if (!botChannel) {
-      player.destroy();
-      client.playerMap.delete(oldState.channel.id);
-      return;
-    } else {
-      player.channelId = botChannel.id;
+    if (newState.channelId !== oldChannel.id) {
+      client.playerMap.delete(oldChannel.id);
+      client.playerMap.set(newState.channelId, player);
+      player.channelId = newState.channelId;
     }
-  }
+	}
 
-  if (!botChannel) {
-    return;
-  }
+	const botChannel = oldState.guild.members.me!.voice.channel;
+	if (!botChannel) {
+		return;
+	}
 
-  const player = client.playerMap.get(botChannel.id)
-  if (!player) {
-    return;
-  }
+	const player = client.playerMap.get(botChannel.id);
+	if (!player) {
+		return;
+	}
+  const callMembers = botChannel.members.filter((member) => !member.user.bot)
+	if (callMembers.size > 1) {
+		return;
+	}
 
-  if (botChannel.members.size > 1) {
-    return;
-  }
-  player.destroy();
+	void player.destroy();
 }

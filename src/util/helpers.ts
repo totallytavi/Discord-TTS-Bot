@@ -41,9 +41,9 @@ export async function connectToChannel(channel: VoiceBasedChannel) {
 		 * sure to destroy it, and propagate the error by throwing it, so that the calling function
 		 * is aware that we failed to connect to the channel.
 		 */
-    if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
-      connection.destroy();
-    }
+		if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
+			connection.destroy();
+		}
 
 		throw error;
 	}
@@ -72,7 +72,13 @@ export async function startVoiceCall(client: TtsClient, channel: VoiceBasedChann
 
 	const player = createAudioPlayer();
 	connection.subscribe(player);
-	client.playerMap.set(channel.id, new TtsPlayer(channel.id, connection, player, client.redis));
+
+	const tts = new TtsPlayer(channel.id, connection, player, client.redis);
+	connection.on(VoiceConnectionStatus.Destroyed, () => {
+		void tts.stop();
+		if (client.playerMap.get(tts.channelId) === tts) client.playerMap.delete(tts.channelId);
+	});
+	client.playerMap.set(channel.id, tts);
 
 	return connection;
 }
@@ -139,10 +145,10 @@ export async function connectCheck(client: TtsClient, channel: VoiceBasedChannel
 		return [true, 'Not in VC yet'];
 	}
 
-	if (botMember.voice.channel !== channel) {
+	if (botMember.voice.channelId !== channel.id) {
 		return [false, "I'm in a differnt VC!"];
 	} else {
-		if (!client.playerMap.has(botMember.voice.channel.id)) {
+		if (!client.playerMap.has(botMember.voice.channelId)) {
 			return [true, 'Reconnect, missing channel connection'];
 		} else {
 			return [false, "I'm already in your VC!"];
@@ -154,14 +160,13 @@ export async function connectCheck(client: TtsClient, channel: VoiceBasedChannel
 // Posted by anthumchris, modified by community. See post 'Timeline' for change history
 // Retrieved 2026-06-26, License - CC BY-SA 4.0
 export function ReadableBufferStream(ab: ArrayBuffer) {
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(ab)
-      controller.close()
-    }
-  })
+	return new ReadableStream({
+		start(controller) {
+			controller.enqueue(ab);
+			controller.close();
+		},
+	});
 }
-
 
 /**
  * Converts a relative directory to a well formatted path for node:fs.

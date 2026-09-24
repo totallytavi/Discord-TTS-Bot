@@ -4,6 +4,7 @@ import {
 	createAudioResource,
 	entersState,
 	type VoiceConnection,
+	VoiceConnectionDisconnectReason,
 	VoiceConnectionStatus,
 } from '@discordjs/voice';
 import { Attachment, type Message } from 'discord.js';
@@ -49,13 +50,18 @@ export class TtsPlayer extends EventEmitter {
 		attachments: Map<unknown, Attachment>;
 		lang: string;
 		nick: string;
-    volume: number;
+		volume: number;
 	}[] = [];
 	/**
 	 * @private
 	 * @desc Whether the player is looping and playing TTS messages. Acts as a debounce
 	 */
 	private isPlaying = false;
+	/**
+	 * @private
+	 * @desc Whether we are trying to reconnect due to a disconnect
+	 */
+	private reconnecting = false;
 	/**
 	 * @private
 	 * @see {@link TtsPlayer.stop()}
@@ -67,12 +73,25 @@ export class TtsPlayer extends EventEmitter {
 	 * @desc The ID of the last author read during TTS playback. Used to prevent saying "<username> said" repeatedly
 	 */
 	private lastAuthor: string | null = null;
+  /**
+   * @private
+   * @desc Channel ID for this TTS player
+   */
+  private _channelId: string;
+  /**
+   * @public
+   * @desc Channel ID for this TTS player
+   */
+  get channelId() {
+    return this._channelId;
+  }
 	/**
 	 * @public
 	 * @desc Channel ID for this TTS player
 	 */
-	set channelId(_newId: string) {
+	set channelId(newId: string) {
 		this.stop();
+		this._channelId = newId;
 	}
 
 	/**
@@ -101,7 +120,7 @@ export class TtsPlayer extends EventEmitter {
 		this.redis = redis;
 		this.connection = connection;
 		this.player = player;
-		this.channelId = channelId;
+		this._channelId = channelId;
 
 		this.on('queueMessage', async (client: TtsClient, message: Message<true>) => {
 			const msg = await this.transformMessage(client, message);
@@ -111,9 +130,57 @@ export class TtsPlayer extends EventEmitter {
 		this.player.on('error', (error) => {
 			console.error('Audio player error:', error);
 		});
-    this.connection.on('error', (error) => {
-      console.error("VoiceConnection error:", String(error));
-    });
+		this.connection.on('error', (error) => {
+			console.error('VoiceConnection error:', String(error));
+		});
+		this.connection.on('stateChange', (_, newState) => {
+			if (newState.status !== VoiceConnectionStatus.Disconnected) return;
+
+			if (newState.reason === VoiceConnectionDisconnectReason.Manual) return;
+			if (this.reconnecting) return;
+
+			void this.handleDisconnect(
+				newState.reason === VoiceConnectionDisconnectReason.WebSocketClose && newState.closeCode === 4014,
+			);
+		});
+	}
+
+	private async handleDisconnect(code4014: boolean) {
+		this.reconnecting = true;
+		try {
+			if (code4014) {
+				try {
+					await Promise.race([
+						entersState(this.connection, VoiceConnectionStatus.Signalling, 5_000),
+						entersState(this.connection, VoiceConnectionStatus.Connecting, 5_000),
+					]);
+					return;
+				} catch {
+					// We got removed, stop processing
+					await this.destroy();
+					return;
+				}
+			}
+
+			// Attempt reconnect with backoff
+			for (let attempt = 1; attempt <= 5; attempt++) {
+				await new Promise((r) => setTimeout(r, attempt * 5_000));
+				if (this.connection.state.status === VoiceConnectionStatus.Destroyed) return;
+				if (this.connection.rejoin()) {
+					try {
+						await entersState(this.connection, VoiceConnectionStatus.Ready, 15_000);
+						return;
+					} catch {}
+				}
+			}
+
+      // Reconnect failed for whatever reason
+			await this.destroy();
+		} catch(err) {
+      console.error('Reconnect failed', code4014, String(err));
+    } finally {
+			this.reconnecting = false;
+		}
 	}
 
 	/**
@@ -131,13 +198,13 @@ export class TtsPlayer extends EventEmitter {
 			nick: '',
 			lang: '',
 			content: '',
-      volume: 1.0
+			volume: 1.0,
 		};
 
 		const settings = await getSettings(client, payload.authorId, message.guildId);
 		payload.nick = settings.nick || message.member?.displayName || message.author.displayName;
 		payload.lang = settings.lang || 'en-GB';
-    payload.volume = settings.volume || 1;
+		payload.volume = settings.volume || 1;
 
 		const mentions = message.mentions;
 		payload.content = message.cleanContent.replace(/<(.)(.+?)>/g, function (_, type: string, id: string) {
@@ -217,23 +284,23 @@ export class TtsPlayer extends EventEmitter {
 	 */
 	private async playUrls(urls: string[], volume: number) {
 		while (urls.length > 0) {
-      const url = urls.shift()!;
-      this.controller = new AbortController();
+			const url = urls.shift()!;
+			this.controller = new AbortController();
 			await fetchUrl(url, this.redis)
 				.then((buff) => {
 					if (!buff) return new Readable();
 					else return Readable.from(buff);
 				})
 				.then((stream) => createAudioResource(stream, { inlineVolume: volume !== 1 }))
-        .then((resource) => {
-          if (volume === 1) return resource;
-          resource.volume!.setVolume(volume)
-          return resource;
-        })
+				.then((resource) => {
+					if (volume === 1) return resource;
+					resource.volume!.setVolume(volume);
+					return resource;
+				})
 				.then((resource) => this.player.play(resource))
 				.then(() =>
 					entersState(this.player, AudioPlayerStatus.Idle, this.controller.signal).catch((err) => {
-						if (String(err).includes("AbortError")) {
+						if (String(err).includes('AbortError')) {
 							urls.length = 0;
 							return Promise.resolve();
 						} else {
@@ -259,21 +326,20 @@ export class TtsPlayer extends EventEmitter {
 				const message = this.queue.shift()!;
 				const content = this.prepareContent(message);
 
-        if (!content || typeof(content) !== "string") {
-          console.warn("Message content was not a string", JSON.stringify(message));
-          continue;
-        }
+				if (!content || typeof content !== 'string') {
+					console.warn('Message content was not a string', JSON.stringify(message));
+					continue;
+				}
 
 				this.lastAuthor = message.authorId;
 				await this.playUrls(
 					getAllAudioUrls(content, {
 						lang: message.lang || 'en-GB',
 					}).map((obj) => obj.url),
-          message.volume || 1,
-				)
-          .catch((err) => {
-            console.warn("Uncaught error in playNext()", String(err));
-          });
+					message.volume || 1,
+				).catch((err) => {
+					console.warn('Uncaught error in playNext()', String(err));
+				});
 			}
 		} catch (err) {
 			console.error('Failed to play TTS message:', err);
@@ -306,9 +372,8 @@ export class TtsPlayer extends EventEmitter {
 			return;
 		}
 
-		this.connection.disconnect();
 		if (this.connection.state.status !== VoiceConnectionStatus.Destroyed) {
-			this.connection.destroy(false);
+			this.connection.destroy();
 		}
 	}
 }
