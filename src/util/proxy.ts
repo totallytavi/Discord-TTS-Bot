@@ -39,7 +39,13 @@ async function fetchUrl(url: string, redisClient?: ReturnType<typeof createClien
 
     const buf = Buffer.from(await resp.arrayBuffer());
     try {
-      redisClient.set(cacheKey, buf.toBase64());
+      redisClient.set(cacheKey, buf.toBase64(), {
+        // Hold keys for 24 hours
+        expiration: {
+          type: 'EX',
+          value: 60 * 60 * 24
+        }
+      });
     } catch(err) {
       console.error("Cache write failed", err);
     }
