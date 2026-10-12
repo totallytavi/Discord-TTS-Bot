@@ -35,8 +35,8 @@ export async function execute(client: TtsClient, oldState: VoiceState, newState:
 	if (!player) {
 		return;
 	}
-  const callMembers = botChannel.members.filter((member) => !member.user.bot)
-	if (callMembers.size > 1) {
+  	const callMembers = botChannel.members.filter((member) => !member.user.bot)
+	if (callMembers.size > 0) {
 		return;
 	}
 
