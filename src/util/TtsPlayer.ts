@@ -289,13 +289,13 @@ export class TtsPlayer extends EventEmitter {
 
 			let data = null,
 				attempts = 3;
-			while (attempts > 0) {
+			while (attempts > 0 && !data) {
 				try {
 					data = await fetchUrl(url, this.redis);
 				} catch (err) {
 					attempts--;
 					// Backoff with a maximum of 1.5 seconds wait time between attempts
-					await new Promise((r) => setTimeout(r, (3 - attempts) * 0.5 * 500));
+					await new Promise((r) => setTimeout(r, (4 - attempts) * 500));
 					if (attempts === 0) {
 						console.error('Failed to fetch TTS URL after 3 attempts', url, String(err));
 						return;
