@@ -13,10 +13,14 @@ function getNextProxy(): string {
 async function fetchUrl(url: string, redisClient?: ReturnType<typeof createClient>): Promise<Buffer | undefined> {
 	if (!PROXIES || !redisClient) {
 		return fetch(url, {
-			signal: AbortSignal.timeout(1000),
+			signal: AbortSignal.timeout(5_000),
 		})
 			.then((res) => res.arrayBuffer())
-			.then((buf) => Buffer.from(buf));
+			.then((buf) => Buffer.from(buf))
+			.catch((err) => {
+				console.error("Couldn't fetch TTS URL", url, err);
+				return undefined;
+			});
 	}
 
 	const cacheKey = `tts:${Buffer.from(url).toString('base64')}`;
@@ -33,6 +37,9 @@ async function fetchUrl(url: string, redisClient?: ReturnType<typeof createClien
 		const resp = await fetch(url, {
 			// Recommended on Node 20+: https://stackoverflow.com/a/76159546
 			dispatcher: new ProxyAgent(getNextProxy()) as any,
+		}).catch((err) => {
+			console.error("Couldn't fetch TTS URL for caching", url, err);
+			return new Response(null, { status: 500, statusText: 'Fetch failed' });
 		});
 
 		if (!resp.ok) {
