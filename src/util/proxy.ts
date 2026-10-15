@@ -12,7 +12,9 @@ function getNextProxy(): string {
 
 async function fetchUrl(url: string, redisClient?: ReturnType<typeof createClient>): Promise<Buffer|undefined> {
   if (!PROXIES || !redisClient) {
-    return fetch(url)
+    return fetch(url, {
+      signal: AbortSignal.timeout(1000)
+    })
       .then((res) => res.arrayBuffer())
       .then((buf) => Buffer.from(buf));
   }
@@ -31,6 +33,7 @@ async function fetchUrl(url: string, redisClient?: ReturnType<typeof createClien
     const resp = await fetch(url, {
       // Recommended on Node 20+: https://stackoverflow.com/a/76159546
       dispatcher: new ProxyAgent(getNextProxy()) as any,
+      signal: AbortSignal.timeout(1000)
     });
 
     if (!resp.ok) {

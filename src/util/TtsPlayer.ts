@@ -73,18 +73,18 @@ export class TtsPlayer extends EventEmitter {
 	 * @desc The ID of the last author read during TTS playback. Used to prevent saying "<username> said" repeatedly
 	 */
 	private lastAuthor: string | null = null;
-  /**
-   * @private
-   * @desc Channel ID for this TTS player
-   */
-  private _channelId: string;
-  /**
-   * @public
-   * @desc Channel ID for this TTS player
-   */
-  get channelId() {
-    return this._channelId;
-  }
+	/**
+	 * @private
+	 * @desc Channel ID for this TTS player
+	 */
+	private _channelId: string;
+	/**
+	 * @public
+	 * @desc Channel ID for this TTS player
+	 */
+	get channelId() {
+		return this._channelId;
+	}
 	/**
 	 * @public
 	 * @desc Channel ID for this TTS player
@@ -174,11 +174,11 @@ export class TtsPlayer extends EventEmitter {
 				}
 			}
 
-      // Reconnect failed for whatever reason
+			// Reconnect failed for whatever reason
 			await this.destroy();
-		} catch(err) {
-      console.error('Reconnect failed', code4014, String(err));
-    } finally {
+		} catch (err) {
+			console.error('Reconnect failed', code4014, String(err));
+		} finally {
 			this.reconnecting = false;
 		}
 	}
@@ -271,7 +271,7 @@ export class TtsPlayer extends EventEmitter {
 		}
 
 		if (message.attachments.size > 0) {
-			content.push(message.attachments.size === 1 ? 'a file' : 'multiple files');
+			content.push('. ', message.attachments.size === 1 ? 'A file' : 'Multiple files');
 		}
 
 		return content.join(' ');
@@ -286,28 +286,39 @@ export class TtsPlayer extends EventEmitter {
 		while (urls.length > 0) {
 			const url = urls.shift()!;
 			this.controller = new AbortController();
-			await fetchUrl(url, this.redis)
-				.then((buff) => {
-					if (!buff) return new Readable();
-					else return Readable.from(buff);
-				})
-				.then((stream) => createAudioResource(stream, { inlineVolume: volume !== 1 }))
-				.then((resource) => {
-					if (volume === 1) return resource;
-					resource.volume!.setVolume(volume);
-					return resource;
-				})
-				.then((resource) => this.player.play(resource))
-				.then(() =>
-					entersState(this.player, AudioPlayerStatus.Idle, this.controller.signal).catch((err) => {
-						if (String(err).includes('AbortError')) {
-							urls.length = 0;
-							return Promise.resolve();
-						} else {
-							return Promise.reject(err);
-						}
-					}),
-				);
+
+			let data = null,
+				attempts = 3;
+			while (attempts > 0) {
+				try {
+					data = await fetchUrl(url, this.redis);
+				} catch (err) {
+					attempts--;
+					// Backoff with a maximum of 1.5 seconds wait time between attempts
+					await new Promise((r) => setTimeout(r, (3 - attempts) * 0.5 * 500));
+					if (attempts === 0) {
+						console.error('Failed to fetch TTS URL after 3 attempts', url, String(err));
+						return;
+					}
+				}
+			}
+			if (!data) {
+				continue;
+			}
+
+			const stream = createAudioResource(Readable.from(data), { inlineVolume: volume !== 1 });
+			if (volume !== 1) {
+				stream.volume!.setVolume(volume);
+			}
+			this.player.play(stream);
+			await entersState(this.player, AudioPlayerStatus.Idle, this.controller.signal).catch((err) => {
+				if (String(err).includes('AbortError')) {
+					urls.length = 0;
+					return Promise.resolve();
+				} else {
+					return Promise.reject(err);
+				}
+			});
 		}
 	}
 
