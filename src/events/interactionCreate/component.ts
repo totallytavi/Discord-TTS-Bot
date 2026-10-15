@@ -27,7 +27,7 @@ export async function execute(
 	if (!handler) {
 		return;
 	} else {
-    try {
+		try {
 			await handler.execute(client, interaction);
 		} catch (err) {
 			console.error('Failed to run command', err);

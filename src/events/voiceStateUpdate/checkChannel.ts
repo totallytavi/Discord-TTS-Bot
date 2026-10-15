@@ -15,15 +15,15 @@ export async function execute(client: TtsClient, oldState: VoiceState, newState:
 		}
 
 		if (!newState.channelId) {
-      void player.destroy();
-      return;
-    }
+			void player.destroy();
+			return;
+		}
 
-    if (newState.channelId !== oldChannel.id) {
-      client.playerMap.delete(oldChannel.id);
-      client.playerMap.set(newState.channelId, player);
-      player.channelId = newState.channelId;
-    }
+		if (newState.channelId !== oldChannel.id) {
+			client.playerMap.delete(oldChannel.id);
+			client.playerMap.set(newState.channelId, player);
+			player.channelId = newState.channelId;
+		}
 	}
 
 	const botChannel = oldState.guild.members.me!.voice.channel;
@@ -35,7 +35,7 @@ export async function execute(client: TtsClient, oldState: VoiceState, newState:
 	if (!player) {
 		return;
 	}
-  	const callMembers = botChannel.members.filter((member) => !member.user.bot)
+	const callMembers = botChannel.members.filter((member) => !member.user.bot);
 	if (callMembers.size > 0) {
 		return;
 	}

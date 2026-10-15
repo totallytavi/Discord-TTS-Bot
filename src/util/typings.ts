@@ -34,10 +34,10 @@ export interface TtsClient extends Client {
 			execute: (context: CommandContext) => Promise<void>;
 		}
 	>;
-  /**
-   * @desc Redis client for caching
-   */
-  redis?: ReturnType<typeof createClient>;
+	/**
+	 * @desc Redis client for caching
+	 */
+	redis?: ReturnType<typeof createClient>;
 }
 
 /**
@@ -88,10 +88,10 @@ export const GTTS_LANGUAGES_MERGED = {
 	Danish: {
 		Denmark: 'da-DK',
 	},
-  // Not a real language, but exists for clueless users
-  Default: {
-    Default: 'en-GB'
-  },
+	// Not a real language, but exists for clueless users
+	Default: {
+		Default: 'en-GB',
+	},
 	Dutch: {
 		Belgium: 'nl-BE',
 		Netherlands: 'nl-NL',

@@ -21,15 +21,13 @@ export async function execute(client: TtsClient, interaction: ModalSubmitInterac
 		language: (userData: user) => {
 			userData.settings[guildId]!.lang = interaction.fields.getStringSelectValues(field.customId)[0] || 'en-GB';
 		},
-    volume: (userData: user) => {
-      const userInput = interaction.fields
-				.getTextInputValue(field.customId)
-        .match(/[0-9](\.[0-9])?/) || ["1.00"];
-      let [num, decimal] = Number(userInput[0]).toFixed(2).split('.').map(Number);
-      num = Math.max(Math.min(num!, 1), 0)
-      decimal = num === 1 ? Math.min(decimal!, 25) : Math.max(decimal!, 25);
-      userData.settings[guildId]!.volume = Number(num + '.' + decimal);
-    }
+		volume: (userData: user) => {
+			const userInput = interaction.fields.getTextInputValue(field.customId).match(/[0-9](\.[0-9])?/) || ['1.00'];
+			let [num, decimal] = Number(userInput[0]).toFixed(2).split('.').map(Number);
+			num = Math.max(Math.min(num!, 1), 0);
+			decimal = num === 1 ? Math.min(decimal!, 25) : Math.max(decimal!, 25);
+			userData.settings[guildId]!.volume = Number(num + '.' + decimal);
+		},
 	} as Record<string, (userData: user) => void>;
 
 	const updateFunction = settings[field.customId];
@@ -50,42 +48,42 @@ export async function execute(client: TtsClient, interaction: ModalSubmitInterac
 	});
 
 	try {
-    if (!userData.settings[guildId]) {
-      userData.settings[guildId] = {}
-    }
+		if (!userData.settings[guildId]) {
+			userData.settings[guildId] = {};
+		}
 		updateFunction(userData);
 		userData.changed('settings', true);
 		await userData.save();
 
 		await getSettings(client, interaction.user.id, interaction.guildId).then((userSettings) => {
 			const embed = new EmbedBuilder()
-        .setTitle('Effective Settings')
-        .setDescription(
-          'Use the provided options to change how the bot speaks as you and says your name. Your current settings are listed below. The bot prefers your global settings if your guild ones are unset',
-        )
-        .addFields(
-          {
-            name: 'Nickname',
-            value: userSettings.nick || '-> None set! <-',
-          },
-          {
-            name: 'Language',
-            value: userSettings.lang || 'en-GB',
-          },
-          {
-            name: 'Volume',
-            value: userSettings.volume ? String(userSettings.volume) : '1'
-          }
-        )
-        .setTimestamp();
+				.setTitle('Effective Settings')
+				.setDescription(
+					'Use the provided options to change how the bot speaks as you and says your name. Your current settings are listed below. The bot prefers your global settings if your guild ones are unset',
+				)
+				.addFields(
+					{
+						name: 'Nickname',
+						value: userSettings.nick || '-> None set! <-',
+					},
+					{
+						name: 'Language',
+						value: userSettings.lang || 'en-GB',
+					},
+					{
+						name: 'Volume',
+						value: userSettings.volume ? String(userSettings.volume) : '1',
+					},
+				)
+				.setTimestamp();
 
 			interaction.editReply({
 				embeds: [embed],
 			});
-      interaction.followUp({
-        content: `Success! Edited your \`${field.customId}\``,
-        flags: ['Ephemeral']
-      });
+			interaction.followUp({
+				content: `Success! Edited your \`${field.customId}\``,
+				flags: ['Ephemeral'],
+			});
 		});
 	} catch (err) {
 		const err_id = btoa(String(Math.floor(Date.now())));

@@ -7,6 +7,6 @@ export const data = new SlashCommandBuilder()
 	.setDefaultMemberPermissions(new PermissionsBitField(['ManageGuild']).bitfield)
 	.setContexts(InteractionContextType.Guild);
 export const execute = async ({ interaction }: CommandContext) => {
-  interaction.editReply({ content: "This is pending implementation" });
+	interaction.editReply({ content: 'This is pending implementation' });
 	// TODO: Add server configuration and Sequelize connection data
 };

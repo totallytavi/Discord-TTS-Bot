@@ -37,13 +37,13 @@ client.sequelize = sequelize as unknown as (typeof client)['sequelize'];
 client.commands = new Map();
 
 try {
-  client.redis = createClient({
-    url: process.env.REDIS_URL!,
-    username: process.env.REDIS_USERNAME!,
-    password: process.env.REDIS_PASSWORD!
-  });
+	client.redis = createClient({
+		url: process.env.REDIS_URL!,
+		username: process.env.REDIS_USERNAME!,
+		password: process.env.REDIS_PASSWORD!,
+	});
 } catch (err) {
-  console.warn("Redis failed to connect, no caching will be done", String(err));
+	console.warn('Redis failed to connect, no caching will be done', String(err));
 }
 
 try {

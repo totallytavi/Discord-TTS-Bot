@@ -5,12 +5,12 @@ export const data = new SlashCommandBuilder()
 	.setName('leave')
 	.setDescription('Disconnects the bot from the voice channel')
 	.setDefaultMemberPermissions(new PermissionsBitField(['Connect', 'Speak']).bitfield)
-  .setContexts(InteractionContextType.Guild);
+	.setContexts(InteractionContextType.Guild);
 export const execute = async ({ client, interaction }: CommandContext) => {
-  if (!interaction.member.voice.channel) {
-    await interaction.editReply({ content: 'You need to be in a voice channel to use this command' });
-    return;
-  }
+	if (!interaction.member.voice.channel) {
+		await interaction.editReply({ content: 'You need to be in a voice channel to use this command' });
+		return;
+	}
 
 	const botMember = await interaction.guild.members.fetchMe();
 	if (!botMember.voice.channelId) {
@@ -19,27 +19,27 @@ export const execute = async ({ client, interaction }: CommandContext) => {
 	}
 
 	if (!client.playerMap.has(interaction.member.voice.channelId!)) {
-    await interaction.editReply({ content: "Something went wrong, I should disconnect shortly" });
-    // Attempt to forcefully disconnect ourselves
-    interaction.guild.shard.send({
-      op: 4,
-      d: {
-        guild_id: interaction.guildId,
-        channel_id: null,
-        self_mute: false,
-        self_deaf: false
-      }
-    });
-    return;
-  }
+		await interaction.editReply({ content: 'Something went wrong, I should disconnect shortly' });
+		// Attempt to forcefully disconnect ourselves
+		interaction.guild.shard.send({
+			op: 4,
+			d: {
+				guild_id: interaction.guildId,
+				channel_id: null,
+				self_mute: false,
+				self_deaf: false,
+			},
+		});
+		return;
+	}
 
-  try {
-    await client.playerMap.get(interaction.member.voice.channelId!)!.destroy();
-    client.playerMap.delete(interaction.member.voice.channelId!);
+	try {
+		await client.playerMap.get(interaction.member.voice.channelId!)!.destroy();
+		client.playerMap.delete(interaction.member.voice.channelId!);
 
-    await interaction.editReply({ content: 'Disconnected from voice channel!' });
-  } catch (error) {
-    console.error('Error destroying player:', error);
-    await interaction.editReply({ content: 'Failed to disconnect from the voice channel' });
-  }
+		await interaction.editReply({ content: 'Disconnected from voice channel!' });
+	} catch (error) {
+		console.error('Error destroying player:', error);
+		await interaction.editReply({ content: 'Failed to disconnect from the voice channel' });
+	}
 };

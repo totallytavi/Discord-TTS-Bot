@@ -26,5 +26,5 @@ export async function execute(client: TtsClient) {
 	}
 
 	setInterval(() => pickRandomStatus(), 60 * 60 * 1000);
-  pickRandomStatus();
+	pickRandomStatus();
 }

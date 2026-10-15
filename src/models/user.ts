@@ -3,7 +3,7 @@ import { DataTypes, Model, Optional } from 'sequelize';
 
 export interface userAttributes {
 	userId: string;
-  // Key is the guild ID, where 0 is global
+	// Key is the guild ID, where 0 is global
 	settings: Record<string, userSettings>;
 }
 
@@ -19,10 +19,10 @@ export interface userSettings {
 	 * Preferred language of the user
 	 */
 	lang?: string;
-  /**
-   * A number between 0.25 and 1.25
-   */
-  volume?: number;
+	/**
+	 * A number between 0.25 and 1.25
+	 */
+	volume?: number;
 }
 
 export type userPk = 'userId';

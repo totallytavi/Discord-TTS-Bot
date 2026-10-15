@@ -38,7 +38,7 @@ export class server extends Model<serverAttributes, serverCreationAttributes> im
 				settings: {
 					type: DataTypes.JSON,
 					allowNull: false,
-          defaultValue: {}
+					defaultValue: {},
 				},
 			},
 			{
