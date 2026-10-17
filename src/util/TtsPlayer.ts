@@ -10,11 +10,11 @@ import {
 import { Attachment, type Message } from 'discord.js';
 import { getAllAudioUrls } from 'google-tts-api';
 import { EventEmitter } from 'node:events';
-import { getSettings } from './helpers.js';
-import { type TtsClient } from './typings.js';
-import { fetchUrl } from './proxy.js';
-import { type createClient } from 'redis';
 import { Readable } from 'node:stream';
+import { type createClient } from 'redis';
+import { getSettings } from './helpers.js';
+import { fetchUrl } from './proxy.js';
+import { type TtsClient } from './typings.js';
 
 type TtsRedisClient = ReturnType<typeof createClient>;
 /**
@@ -303,6 +303,7 @@ export class TtsPlayer extends EventEmitter {
 				}
 			}
 			if (!data) {
+				console.error('Failed to fetch TTS URL after 3 attempts (No data returned?)', url);
 				continue;
 			}
 
